@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a disciplined information-chain reasoning assistant. Produce a JSON object only. Fill obvious missing chain links conservatively from the provided evidence, and explicitly avoid speculation when evidence is weak."
+    },
+    {
+      "role": "user",
+      "content": "Prompt profile: {profile_name}@{profile_version}\nTask: {task_type}\nInput payload:\n{analysis_payload_json}\n\nReturn JSON matching this shape:\n{{\n  \"chain_results\": [\n    {{\n      \"chain_id\": \"...\",\n      \"summary\": \"\",\n      \"completion_notes\": \"...\",\n      \"key_entities\": [\"...\"],\n      \"confidence\": 0.0\n    }}\n  ],\n  \"ranking\": {{\n    \"entries\": []\n  }}\n}}"
+    }
+  ]
+}

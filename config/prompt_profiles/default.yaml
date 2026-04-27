@@ -1,0 +1,12 @@
+# Default prompt profile configuration
+---
+profile_name: "default"
+version: "1.0.0"
+description: "默认 prompt profile - 平衡的分析风格"
+tasks:
+  summary:
+    template: "summary.json"
+  chain_completion:
+    template: "chain_completion.json"
+  investment_ranking:
+    template: "investment_ranking.json"

@@ -1,0 +1,93 @@
+"""
+a-share-mapping — A 股映射层
+
+将信息链映射到 A 股板块、产业环节、受益方向与候选标的池。
+"""
+
+from app.mapping.schema import (
+    ConfidenceLevel,
+    SectorMapping,
+    StockPoolMapping,
+    IndividualStockMapping,
+    AStockMapping,
+    MappingScoreDimensions,
+    AShareMappingScore,
+    EvidenceSourceReference,
+    EvidenceSnippetReference,
+    MappingEvidence,
+    AShareMappingWithEvidence,
+)
+from app.mapping.industry_chain import (
+    IndustryChainPosition,
+    IndustryChainNode,
+    IndustryChainMap,
+    get_industry_chain_map,
+    reload_industry_chain_map,
+)
+from app.mapping.engine import (
+    AShareMappingEngine,
+    MappingResult,
+    create_mapping_engine,
+    map_chain_to_a_share,
+    MappingScoringEngine,
+    ScoringResult,
+    create_scoring_engine,
+    score_chain,
+    score_mapping,
+    MappingEvidenceCollector,
+    create_evidence_collector,
+    collect_evidence_for_chain,
+    map_and_collect_evidence,
+)
+from app.mapping.report import (
+    DailyReportHeader,
+    DailyReportChainEntry,
+    DailyReport,
+    MarkdownReportGenerator,
+    JsonReportGenerator,
+    DailyReportBuilder,
+    create_report_builder,
+    generate_markdown_report,
+    generate_json_report,
+)
+
+__all__ = [
+    "ConfidenceLevel",
+    "SectorMapping",
+    "StockPoolMapping",
+    "IndividualStockMapping",
+    "AStockMapping",
+    "MappingScoreDimensions",
+    "AShareMappingScore",
+    "EvidenceSourceReference",
+    "EvidenceSnippetReference",
+    "MappingEvidence",
+    "AShareMappingWithEvidence",
+    "IndustryChainPosition",
+    "IndustryChainNode",
+    "IndustryChainMap",
+    "get_industry_chain_map",
+    "reload_industry_chain_map",
+    "AShareMappingEngine",
+    "MappingResult",
+    "create_mapping_engine",
+    "map_chain_to_a_share",
+    "MappingScoringEngine",
+    "ScoringResult",
+    "create_scoring_engine",
+    "score_chain",
+    "score_mapping",
+    "MappingEvidenceCollector",
+    "create_evidence_collector",
+    "collect_evidence_for_chain",
+    "map_and_collect_evidence",
+    "DailyReportHeader",
+    "DailyReportChainEntry",
+    "DailyReport",
+    "MarkdownReportGenerator",
+    "JsonReportGenerator",
+    "DailyReportBuilder",
+    "create_report_builder",
+    "generate_markdown_report",
+    "generate_json_report",
+]

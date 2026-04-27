@@ -1,0 +1,74 @@
+# config.yaml — business configuration for the daily AI investment pipeline.
+#
+# Secrets and API tokens belong in .env, NOT here.
+# This file is safe to commit to source control.
+
+# ---------------------------------------------------------------------------
+# Data-source adapter switches
+# ---------------------------------------------------------------------------
+sources:
+  akshare: true           # AkShare financial/news data adapter
+  web: true               # Static web / RSS collector
+  # web-access deep-research collector.
+  # This is a mandatory participant in every daily run, not an optional extra.
+  copilot_research: true
+  # Number of days to retain collected items (items older than this are filtered out).
+  # Default: 7 (keep last week only).
+  date_filter_days: 7
+
+# ---------------------------------------------------------------------------
+# Daily run schedule
+# ---------------------------------------------------------------------------
+scheduler:
+  # A-share market opens at 09:30 CST.
+  # Run 1 — one hour before open: enough lead time for analysis to complete.
+  # Run 2 — 14:00: captures the morning news cycle and pre-close signals.
+  # Both runs produce independent output batches (same-day multi-batch is supported).
+  runs:
+    - "08:30"
+    - "14:00"
+
+# ---------------------------------------------------------------------------
+# LLM prompt profiles
+# ---------------------------------------------------------------------------
+prompt:
+  default_profile: default
+  profiles_dir: config/prompt_profiles
+  templates_dir: app/analysis/prompts/templates
+
+# ---------------------------------------------------------------------------
+# LLM adapter — OpenAI-compatible endpoint
+# ---------------------------------------------------------------------------
+# When endpoint is set, the OpenAI-compatible adapter is used.
+# When empty, falls back to GitHub Models adapter (legacy).
+llm:
+  endpoint: https://ark.cn-beijing.volces.com/api/coding/v3
+  model_id: glm-5.1
+  # API key is read from LLM_API_KEY env var (set in .env)
+  # api_key_env_var: LLM_API_KEY
+
+# ---------------------------------------------------------------------------
+# Storage paths (relative to project root)
+# ---------------------------------------------------------------------------
+storage:
+  db_path: data/db/mm.db
+  raw_dir: data/raw
+
+# ---------------------------------------------------------------------------
+# Report output
+# ---------------------------------------------------------------------------
+output:
+  reports_dir: data/reports
+  formats:
+    - markdown
+    - json
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  # Directory where mm.log (and daily-rotated copies) are written.
+  # Relative to the project root.
+  log_dir: data/logs
+  # Minimum severity to record.  One of: DEBUG / INFO / WARNING / ERROR / CRITICAL
+  level: INFO

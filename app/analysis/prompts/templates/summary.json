@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a disciplined investment-news analysis assistant. Produce a JSON object only. For each input chain, write a concise factual summary grounded in the supplied evidence. Do not invent facts."
+    },
+    {
+      "role": "user",
+      "content": "Prompt profile: {profile_name}@{profile_version}\nTask: {task_type}\nInput payload:\n{analysis_payload_json}\n\nReturn JSON matching this shape:\n{{\n  \"chain_results\": [\n    {{\n      \"chain_id\": \"...\",\n      \"summary\": \"...\",\n      \"completion_notes\": \"\",\n      \"key_entities\": [\"...\"],\n      \"confidence\": 0.0\n    }}\n  ],\n  \"ranking\": {{\n    \"entries\": []\n  }}\n}}"
+    }
+  ]
+}

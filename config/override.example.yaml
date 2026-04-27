@@ -1,0 +1,47 @@
+# override.example.yaml — example override configuration for the daily pipeline.
+#
+# Usage:
+#   python -m app.main run --override config/override.yaml
+#   python -m app.main dry-run --override config/override.yaml
+#
+# All fields are optional.  When absent, base config.yaml / CLI defaults are used.
+
+# Search keywords — forwarded to web collector and copilot research transport
+search_keywords:
+  - "AI芯片"
+  - "半导体产业政策"
+  - "新能源汽车补贴"
+
+# Data source overrides
+sources:
+  # Subset of AkShare providers to enable; omit or leave empty to use all (cctv + caixin)
+  akshare_providers:
+    - "cctv"
+  # Web source list — replaces constructor-provided sources for this run only
+  web_sources:
+    - url: "https://36kr.com/feed"
+      type: "rss"
+      provider: "36kr"
+      timeout: 30
+  # Copilot research enabled/disabled for this run (omit to follow config.yaml)
+  copilot_research_enabled: true
+  # Number of days to retain collected items (omit to follow config.yaml default of 7)
+  date_filter_days: 7
+
+# Prompt profile name — overrides both config.yaml default and --prompt-profile CLI flag
+prompt_profile: "default"
+
+# Template-level prompt customisation
+prompt_overrides:
+  # Appended to the system message of ALL task types
+  system_message_suffix: "\n今日重点：AI芯片供应链动态。"
+  # Per-task overrides (keys: summary, chain_completion, investment_ranking)
+  tasks:
+    summary:
+      # Prepend to the user message content for the summary task
+      user_message_prefix: "背景：今日发布芯片出口新规。"
+    investment_ranking:
+      # Replace the system message entirely for the investment_ranking task
+      system_message: "优先评估半导体和AI产业链的投资信号。"
+      # Append to the user message content
+      user_message_suffix: "\n权重调整：AI供应链主题权重 x2。"
