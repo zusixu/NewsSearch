@@ -17,6 +17,10 @@ from app.collectors.copilot_research_collector import (
     ResearchResponse,
     ResearchTransport,
 )
+from app.collectors.web_access_transport import (
+    WebAccessTransport,
+    WebAccessTransportConfig,
+)
 from app.collectors.raw_document import RawDocument
 from app.collectors.retry import with_retry
 
@@ -39,6 +43,9 @@ __all__ = [
     "ResearchRequest",
     "ResearchResponse",
     "ResearchTransport",
+    # web-access transport
+    "WebAccessTransport",
+    "WebAccessTransportConfig",
     # retry utility
     "with_retry",
 ]

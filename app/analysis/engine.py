@@ -35,6 +35,7 @@ from app.analysis.adapters.openai_compatible import (
     OpenAICompatibleConfig,
 )
 from app.analysis.prompts import FileSystemPromptRenderer, PromptProfileConfig, PromptProfileLoader
+from app.analysis.react.engine import ReActAnalysisEngine, ReActEngineConfig
 from app.chains.chain import InformationChain, build_chain
 from app.chains.candidate_generation import generate_candidate_chains
 from app.chains.evidence_retention import ChainEvidenceBundle, collect_all_evidence
@@ -132,6 +133,16 @@ class AnalysisEngineConfig:
     llm_endpoint: str = ""
     llm_api_key: str = ""
     llm_api_key_env_var: str = "LLM_API_KEY"
+    llm_response_format: str | None = "json_object"
+    llm_timeout: int = 120
+    # Analysis mode — "legacy" (single-pass) or "react" (multi-step with tools)
+    analysis_mode: str = "legacy"
+    # ReAct-specific tuning
+    react_max_steps_per_group: int = 5
+    react_max_groups: int = 10
+    react_enable_web_search: bool = True
+    react_enable_web_fetch: bool = True
+    react_enable_akshare_query: bool = True
 
 
 class AnalysisEngine:
@@ -190,6 +201,8 @@ class AnalysisEngine:
                 endpoint=config.llm_endpoint,
                 api_key=config.llm_api_key,
                 api_key_env_var=config.llm_api_key_env_var,
+                response_format=config.llm_response_format,
+                timeout=config.llm_timeout,
             )
             self._adapter = OpenAICompatibleAdapter(oai_config, self._renderer)
         else:
@@ -202,6 +215,23 @@ class AnalysisEngine:
             env = dict(os.environ)
             env["GITHUB_TOKEN"] = config.github_token
             self._adapter = GitHubModelsAdapter(gh_config, self._renderer, env=env)
+
+        # Create ReAct engine when analysis_mode is "react"
+        self._react_engine: ReActAnalysisEngine | None = None
+        if config.analysis_mode == "react":
+            react_config = ReActEngineConfig(
+                max_steps_per_group=config.react_max_steps_per_group,
+                max_groups=config.react_max_groups,
+                enable_web_search=config.react_enable_web_search,
+                enable_web_fetch=config.react_enable_web_fetch,
+                enable_akshare_query=config.react_enable_akshare_query,
+            )
+            self._react_engine = ReActAnalysisEngine(
+                adapter=self._adapter,
+                renderer=self._renderer,
+                engine_config=react_config,
+                dry_run=dry_run,
+            )
 
     def load_profile(self, profile_name: str | None = None) -> PromptProfileConfig:
         """
@@ -310,6 +340,41 @@ class AnalysisEngine:
         # Run analysis
         return self._adapter.analyse(analysis_input)
 
+    def run_react_analysis(
+        self,
+        tagged_outputs: Sequence[TaggedOutput],
+        profile_name: str | None = None,
+    ) -> tuple[list[InformationChain], AnalysisResponse, PromptProfileConfig]:
+        """
+        Run the ReAct multi-step analysis pipeline.
+
+        Parameters
+        ----------
+        tagged_outputs
+            Tagged outputs to process.
+        profile_name
+            Optional prompt profile name to use (overrides default).
+
+        Returns
+        -------
+        tuple[list[InformationChain], AnalysisResponse, PromptProfileConfig]
+            (chains, analysis_response, profile_config)
+
+        Raises
+        ------
+        RuntimeError
+            If the ReAct engine is not initialised (analysis_mode != "react").
+        """
+        if self._react_engine is None:
+            raise RuntimeError(
+                "ReAct engine is not initialised; "
+                "set analysis_mode='react' in AnalysisEngineConfig"
+            )
+
+        profile_config = self.load_profile(profile_name)
+        chains, response = self._react_engine.run(tagged_outputs)
+        return (chains, response, profile_config)
+
     def run_full_analysis(
         self,
         tagged_outputs: Sequence[TaggedOutput],
@@ -317,6 +382,9 @@ class AnalysisEngine:
     ) -> tuple[list[InformationChain], AnalysisResponse, PromptProfileConfig]:
         """
         Run the full analysis pipeline: build chains, analyse, return everything.
+
+        Dispatches to either legacy (single-pass) or ReAct (multi-step) analysis
+        based on ``analysis_mode`` in the engine config.
 
         Parameters
         ----------
@@ -330,7 +398,40 @@ class AnalysisEngine:
         tuple[list[InformationChain], AnalysisResponse, PromptProfileConfig]
             (chains, analysis_response, profile_config)
         """
+        # Dispatch to ReAct engine when analysis_mode is "react"
+        if self._config.analysis_mode == "react":
+            return self.run_react_analysis(tagged_outputs, profile_name)
+
+        # --- legacy single-pass analysis ---
         profile_config = self.load_profile(profile_name)
         chains = self.build_chains(tagged_outputs)
         response = self.analyse_chains(chains, profile_config)
+
+        # Fallback: synthesise ranking from chain_results when LLM omits it
+        if not response.ranking.entries and response.chain_results:
+            from app.analysis.adapters.contracts import ChainRankingEntry, RankingOutput
+
+            sorted_results = sorted(
+                response.chain_results,
+                key=lambda r: r.confidence,
+                reverse=True,
+            )
+            fallback_entries = tuple(
+                ChainRankingEntry(
+                    chain_id=r.chain_id,
+                    rank=idx + 1,
+                    score=r.confidence,
+                    rationale="Auto-ranked by confidence (LLM provided no ranking).",
+                )
+                for idx, r in enumerate(sorted_results[:10])
+            )
+            response = AnalysisResponse(
+                chain_results=response.chain_results,
+                ranking=RankingOutput(
+                    entries=fallback_entries,
+                    prompt_profile=response.ranking.prompt_profile,
+                ),
+                provider_info=response.provider_info,
+            )
+
         return (chains, response, profile_config)

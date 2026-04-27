@@ -203,7 +203,7 @@ class GitHubModelsAPIError(GitHubModelsError):
 
 # Type alias for the injectable HTTP-open callable.
 # Signature: (request: urllib.request.Request, timeout: int) -> http.client.HTTPResponse
-_OpenFunc = Callable[[urllib.request.Request, int], object]
+_OpenFunc = Callable[..., object]
 
 
 class GitHubModelsAdapter:
@@ -307,7 +307,7 @@ class GitHubModelsAdapter:
             method="POST",
         )
         try:
-            resp = self._open_func(req, self._config.timeout)
+            resp = self._open_func(req, timeout=self._config.timeout)
         except urllib.error.HTTPError as exc:
             try:
                 body = exc.read().decode("utf-8")

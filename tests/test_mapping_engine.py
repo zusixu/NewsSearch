@@ -7,6 +7,7 @@
 import datetime
 import uuid
 from typing import List
+from unittest import mock
 
 import pytest
 
@@ -232,6 +233,59 @@ class TestMappingResult:
 # ---------------------------------------------------------------------------
 
 
+class TestEngineWithStockResolver:
+    """测试注入 AkShareStockResolver 后的映射引擎行为。"""
+
+    def test_engine_without_resolver_uses_hardcoded_only(self) -> None:
+        """不注入 resolver 时，个股映射包含硬编码数据（与注入前行为一致）。"""
+        engine = AShareMappingEngine(stock_resolver=None)
+        chain = create_dummy_chain(["compute"])
+        mapping = engine.map_information_chain(chain)
+
+        # compute 节点硬编码有 5 条候选，应全部出现在结果中
+        compute_node = get_industry_chain_map().get_node_by_id("compute")
+        assert compute_node is not None
+        hardcoded_codes = {code for code, _ in compute_node.stock_candidates}
+        result_codes = {m.stock_code for m in mapping.individual_stock_mappings}
+        assert hardcoded_codes.issubset(result_codes)
+
+    def test_engine_with_resolver_expands_candidates(self) -> None:
+        """注入 resolver 后，个股映射应包含动态扩展的数据。"""
+        from app.mapping.akshare_resolver import AkShareStockResolver
+
+        resolver = AkShareStockResolver()
+        dynamic_stocks = [("999999", "动态股票")]
+
+        with mock.patch.object(
+            resolver, "resolve_stocks_for_node", return_value=(
+                ("600588", "用友网络"),
+                ("000977", "浪潮信息"),
+                ("999999", "动态股票"),
+            )
+        ):
+            engine = AShareMappingEngine(stock_resolver=resolver)
+            chain = create_dummy_chain(["compute"])
+            mapping = engine.map_information_chain(chain)
+
+        # resolver 返回 3 条，映射后也应为 3 条（在 10 条限制内）
+        assert len(mapping.individual_stock_mappings) == 3
+        codes = [m.stock_code for m in mapping.individual_stock_mappings]
+        assert "999999" in codes
+
+    def test_create_mapping_engine_accepts_resolver(self) -> None:
+        """测试 create_mapping_engine 工厂函数接受 resolver 参数。"""
+        from app.mapping.akshare_resolver import AkShareStockResolver
+
+        resolver = AkShareStockResolver()
+        engine = create_mapping_engine(stock_resolver=resolver)
+        assert engine._stock_resolver is resolver
+
+
+# ---------------------------------------------------------------------------
+# Test package exports
+# ---------------------------------------------------------------------------
+
+
 class TestPackageExports:
     """测试包导出。"""
 
@@ -246,3 +300,9 @@ class TestPackageExports:
         import app.mapping as mapping
         assert hasattr(mapping, "create_mapping_engine")
         assert hasattr(mapping, "map_chain_to_a_share")
+
+    def test_resolver_is_exported(self) -> None:
+        """测试 AkShareStockResolver 可从包中导入。"""
+        import app.mapping as mapping
+        assert hasattr(mapping, "AkShareStockResolver")
+        assert hasattr(mapping, "create_akshare_resolver")

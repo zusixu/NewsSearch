@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(D:/anaconda3/envs/quant/python.exe -c \"from app.analysis.react.engine import ReActAnalysisEngine, ReActEngineConfig; from app.analysis.adapters.openai_compatible import OpenAICompatibleAdapter, OpenAICompatibleConfig; print\\('All imports OK'\\)\")",
+      "Bash(D:/anaconda3/envs/quant/python.exe -m app.main run --analysis-mode react --date 2026-04-27)",
+      "Bash(D:/anaconda3/envs/quant/python.exe -c ' *)"
+    ]
+  }
+}

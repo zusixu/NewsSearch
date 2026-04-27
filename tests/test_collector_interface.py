@@ -300,9 +300,21 @@ class TestConcreteStubs:
             web = flag
         assert WebCollector().is_enabled(_Cfg()) is expected
 
-    def test_copilot_research_always_enabled(self):
-        """CopilotResearch is mandatory; is_enabled must always return True."""
-        class _Cfg:
-            copilot_research = False  # even if set to False in config
-        assert CopilotResearchCollector().is_enabled(_Cfg()) is True
+    def test_copilot_research_is_enabled_respects_config(self):
+        """is_enabled now reads copilot_research from sources_config."""
+        class _CfgTrue:
+            copilot_research = True
+        class _CfgFalse:
+            copilot_research = False
+
+        assert CopilotResearchCollector().is_enabled(_CfgTrue()) is True
+        assert CopilotResearchCollector().is_enabled(_CfgFalse()) is False
+
+    def test_copilot_research_is_enabled_defaults_true(self):
+        """Default to True when sources_config lacks copilot_research attr."""
         assert CopilotResearchCollector().is_enabled(None) is True
+
+        class _CfgNoAttr:
+            pass
+
+        assert CopilotResearchCollector().is_enabled(_CfgNoAttr()) is True

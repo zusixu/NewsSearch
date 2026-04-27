@@ -34,6 +34,23 @@ from app.analysis.prompts import (
     PromptTemplateError,
     TaskTemplateMapping,
 )
+from app.analysis.react import (
+    GrouperContext,
+    ReActAnalysisEngine,
+    ReActContext,
+    ReActEngineConfig,
+    ReActSession,
+    ReActStep,
+    Tool,
+    ToolRegistry,
+    akshare_query_tool,
+    build_grouper_prompt_context,
+    build_react_finalize_prompt_context,
+    build_react_step_prompt_context,
+    tool_registry,
+    web_fetch_tool,
+    web_search_tool,
+)
 
 __all__ = [
     # contracts
@@ -69,4 +86,20 @@ __all__ = [
     "PromptProfileLoader",
     "PromptProfileError",
     "MissingPromptProfileError",
+    # react
+    "Tool",
+    "ToolRegistry",
+    "tool_registry",
+    "web_search_tool",
+    "web_fetch_tool",
+    "akshare_query_tool",
+    "ReActStep",
+    "ReActSession",
+    "GrouperContext",
+    "ReActContext",
+    "build_grouper_prompt_context",
+    "build_react_step_prompt_context",
+    "build_react_finalize_prompt_context",
+    "ReActAnalysisEngine",
+    "ReActEngineConfig",
 ]

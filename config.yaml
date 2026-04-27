@@ -10,7 +10,7 @@ sources:
   akshare: true           # AkShare financial/news data adapter
   web: true               # Static web / RSS collector
   # web-access deep-research collector.
-  # This is a mandatory participant in every daily run, not an optional extra.
+  # Can be enabled/disabled via this flag.
   copilot_research: true
   # Number of days to retain collected items (items older than this are filtered out).
   # Default: 7 (keep last week only).
@@ -42,10 +42,13 @@ prompt:
 # When endpoint is set, the OpenAI-compatible adapter is used.
 # When empty, falls back to GitHub Models adapter (legacy).
 llm:
-  endpoint: https://ark.cn-beijing.volces.com/api/coding/v3
-  model_id: glm-5.1
+  endpoint: https://api.deepseek.com
+  model_id: deepseek-v4-flash
   # API key is read from LLM_API_KEY env var (set in .env)
   # api_key_env_var: LLM_API_KEY
+  # Some models/endpoints (e.g. Volcengine Ark) do not support `json_object`.
+  # Set to `null` to omit the response_format parameter entirely.
+  response_format: null
 
 # ---------------------------------------------------------------------------
 # Storage paths (relative to project root)
@@ -72,3 +75,16 @@ logging:
   log_dir: data/logs
   # Minimum severity to record.  One of: DEBUG / INFO / WARNING / ERROR / CRITICAL
   level: INFO
+
+# ---------------------------------------------------------------------------
+# Analysis pipeline mode
+# ---------------------------------------------------------------------------
+analysis:
+  # Analysis mode: "legacy" (single-pass LLM) or "react" (multi-step with tools)
+  mode: "legacy"
+  react:
+    max_steps_per_group: 5     # Max ReAct iterations per group
+    max_groups: 10             # Max groups to process
+    enable_web_search: true    # Register web_search tool
+    enable_web_fetch: true     # Register web_fetch tool
+    enable_akshare_query: true # Register akshare_query tool

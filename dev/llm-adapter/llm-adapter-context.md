@@ -18,12 +18,12 @@
 - 使用通用 `OpenAICompatibleAdapter` 而非火山引擎专用适配器，保持兼容性。
 - API Key 优先级：`config.api_key` 直接设置 > `api_key_env_var` 环境变量。
 - 适配器选择逻辑：`llm.endpoint` 非空 → OpenAI 兼容；否则 → GitHub Models（向后兼容）。
-- 默认模型改为 `glm-5.1`。
+- 默认模型改为 `deepseek-v4-flash`。
 
 ## 环境 / 配置假设
 
-- 端点：`https://ark.cn-beijing.volces.com/api/coding/v3`
-- 模型：`glm-5.1`
+- 端点：`https://ark.cn-beijing.volces.com/api/v3/chat/completions`
+- 模型：`deepseek-v4-flash`
 - API Key 存储在 `.env` 的 `LLM_API_KEY` 中。
 
 ## 当前进度

@@ -114,7 +114,7 @@ def _make_open_func(body: str, code: int = 200):
     """Return a callable that ignores the request and returns _FakeResponse."""
     fake = _FakeResponse(body, code)
 
-    def _open(req, timeout):
+    def _open(req, *, timeout=None, **kwargs):
         return fake
 
     return _open

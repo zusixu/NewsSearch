@@ -61,11 +61,11 @@ class OpenAICompatibleConfig:
     Fields
     ------
     model_id
-        Model identifier, e.g. ``"glm-5.1"``, ``"deepseek-chat"``.
+        Model identifier, e.g. ``"deepseek-v4-flash"``, ``"deepseek-chat"``.
         Must be non-empty.
     endpoint
         Full chat-completions endpoint URL.
-        e.g. ``"https://ark.cn-beijing.volces.com/api/coding/v3"``.
+        e.g. ``"https://ark.cn-beijing.volces.com/api/v3/chat/completions"``.
     api_key
         API key string.  When non-empty, takes precedence over
         ``api_key_env_var``.
@@ -88,6 +88,7 @@ class OpenAICompatibleConfig:
     timeout: int = _DEFAULT_TIMEOUT
     temperature: float | None = None
     extra_headers: dict[str, str] | None = None
+    response_format: str | None = "json_object"
 
     def __post_init__(self) -> None:
         if not self.model_id:
@@ -133,7 +134,7 @@ class OpenAICompatibleAPIError(OpenAICompatibleError):
 # OpenAICompatibleAdapter — AnalysisAdapter implementation
 # ---------------------------------------------------------------------------
 
-_OpenFunc = Callable[[urllib.request.Request, int], object]
+_OpenFunc = Callable[..., object]
 
 
 class OpenAICompatibleAdapter:
@@ -206,8 +207,9 @@ class OpenAICompatibleAdapter:
         payload: dict = {
             "model": self._config.model_id,
             "messages": [m.to_dict() for m in messages],
-            "response_format": {"type": "json_object"},
         }
+        if self._config.response_format is not None:
+            payload["response_format"] = {"type": self._config.response_format}
         if self._config.temperature is not None:
             payload["temperature"] = self._config.temperature
         return payload
@@ -224,14 +226,17 @@ class OpenAICompatibleAdapter:
     def _post(self, payload: dict, api_key: str) -> dict:
         headers = self._build_headers(api_key)
         body_bytes = json.dumps(payload).encode("utf-8")
+        url = self._config.endpoint
+        if not url.rstrip("/").endswith("/chat/completions"):
+            url = url.rstrip("/") + "/chat/completions"
         req = urllib.request.Request(
-            url=self._config.endpoint,
+            url=url,
             data=body_bytes,
             headers=headers,
             method="POST",
         )
         try:
-            resp = self._open_func(req, self._config.timeout)
+            resp = self._open_func(req, timeout=self._config.timeout)
         except urllib.error.HTTPError as exc:
             try:
                 body = exc.read().decode("utf-8")
@@ -243,7 +248,20 @@ class OpenAICompatibleAdapter:
         resp_body: str = resp.read().decode("utf-8")  # type: ignore[union-attr]
         if status >= 300:
             raise OpenAICompatibleAPIError(status, resp_body)
-        return json.loads(resp_body)
+        if not resp_body.strip():
+            raise OpenAICompatibleAPIError(
+                status,
+                "API returned an empty response body (status {status}). "
+                "The endpoint may be incorrect or the server may have dropped the connection."
+            )
+        try:
+            return json.loads(resp_body)
+        except json.JSONDecodeError:
+            snippet = resp_body[:500].replace("\n", " ")
+            raise OpenAICompatibleAPIError(
+                status,
+                f"API response body is not valid JSON. Snippet: {snippet!r}"
+            )
 
     def _parse_response(
         self, raw: dict, prompt_profile: PromptProfile
@@ -253,7 +271,26 @@ class OpenAICompatibleAdapter:
             raise OpenAICompatibleAPIError(200, "Response contained no choices.")
 
         content_str: str = choices[0]["message"]["content"]
-        content: dict = json.loads(content_str)
+        if not content_str or not content_str.strip():
+            raise OpenAICompatibleAPIError(200, "Response content was empty.")
+
+        # Strip Markdown code fences if the model wrapped JSON in ```json ... ```
+        import re
+        stripped = content_str.strip()
+        code_match = re.search(r"```(?:json)?\s*(.*?)```", stripped, re.DOTALL)
+        if code_match:
+            stripped = code_match.group(1).strip()
+        else:
+            stripped = stripped.strip()
+
+        try:
+            content: dict = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            snippet = stripped[:200].replace("\n", " ")
+            raise OpenAICompatibleAPIError(
+                200,
+                f"Response content is not valid JSON. Snippet: {snippet!r}"
+            ) from exc
 
         model_version: str = raw.get("model", self._config.model_id)
 

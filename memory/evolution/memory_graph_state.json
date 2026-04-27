@@ -1,0 +1,49 @@
+{
+  "last_action": {
+    "action_id": "act_1777253183758_50b5cbb3",
+    "signal_key": "memory_missing|session_logs_missing|user_missing",
+    "signals": [
+      "memory_missing",
+      "user_missing",
+      "session_logs_missing"
+    ],
+    "mutation_id": "mut_1777253183755",
+    "mutation_category": "innovate",
+    "mutation_risk_level": "medium",
+    "personality_key": "rigor=0.7|creativity=0.3|verbosity=0.3|risk_tolerance=0.4|obedience=0.9",
+    "personality_state": {
+      "type": "PersonalityState",
+      "rigor": 0.7,
+      "creativity": 0.35,
+      "verbosity": 0.25,
+      "risk_tolerance": 0.4,
+      "obedience": 0.85
+    },
+    "gene_id": null,
+    "gene_category": null,
+    "hypothesis_id": "hyp_1777253183756_18b0f65d",
+    "capsules_used": [],
+    "had_error": false,
+    "created_at": "2026-04-27T01:26:23.758Z",
+    "outcome_recorded": false,
+    "baseline_observed": {
+      "agent": "main",
+      "session_scope": null,
+      "drift_enabled": false,
+      "review_mode": false,
+      "dry_run": false,
+      "system_health": "Uptime: 0.5h | Node: v24.14.1 | Agent RSS: 79.6MB | Disk: 29% (361.6G free) | Node Processes: 1 | Integrations: Nominal",
+      "mood": "Mood: Unknown",
+      "scan_ms": 276,
+      "memory_size_bytes": 0,
+      "recent_error_count": 0,
+      "node": "v24.14.1",
+      "platform": "win32",
+      "cwd": "D:\\project\\mm",
+      "evidence": {
+        "recent_session_tail": "[NO SESSION LOGS FOUND]",
+        "today_log_tail": "[MISSING] D:\\project\\mm\\memory\\2026-04-27.md"
+      }
+    }
+  }
+}

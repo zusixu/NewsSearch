@@ -66,11 +66,16 @@ class ChainEvidenceBundle:
     evidence_links
         链内所有节点贡献的 ``EvidenceLink`` 引用的有序元组，
         按首见顺序排列，按值相等去重（内容完全相同的证据关联只保留一次）。
+    source_urls
+        链内所有 source_items 的非空 URL，按首见顺序去重，用于
+        报告中的来源链接溯源展示。默认值为空元组，
+        确保已有代码向后兼容。
     """
 
     chain_id: str
     source_items: tuple[NewsItem, ...]
     evidence_links: tuple[EvidenceLink, ...]
+    source_urls: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -102,9 +107,11 @@ def collect_chain_evidence(chain: InformationChain) -> ChainEvidenceBundle:
     """
     seen_item_ids: set[int] = set()
     seen_link_keys: set[EvidenceLink] = set()
+    seen_urls: set[str] = set()
 
     agg_items: list[NewsItem] = []
     agg_links: list[EvidenceLink] = []
+    agg_urls: list[str] = []
 
     for node in chain.nodes:
         to = node.tagged_output
@@ -114,6 +121,10 @@ def collect_chain_evidence(chain: InformationChain) -> ChainEvidenceBundle:
             if oid not in seen_item_ids:
                 seen_item_ids.add(oid)
                 agg_items.append(item)
+            # 提取非空 URL 并去重
+            if item.url and item.url not in seen_urls:
+                seen_urls.add(item.url)
+                agg_urls.append(item.url)
 
         for link in to.evidence_links:
             if link not in seen_link_keys:
@@ -124,6 +135,7 @@ def collect_chain_evidence(chain: InformationChain) -> ChainEvidenceBundle:
         chain_id=chain.chain_id,
         source_items=tuple(agg_items),
         evidence_links=tuple(agg_links),
+        source_urls=tuple(agg_urls),
     )
 
 

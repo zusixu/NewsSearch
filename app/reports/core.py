@@ -24,6 +24,7 @@ from app.mapping.schema import (
     MappingEvidence,
 )
 from app.chains.chain import InformationChain
+from app.chains.evidence_retention import ChainEvidenceBundle
 from app.analysis.adapters.contracts import (
     AnalysisResponse,
     ChainAnalysisResult,
@@ -133,6 +134,10 @@ class DailyReportChainEntry:
         带旁证的 A 股映射，可选。
     chain_analysis
         完整的链分析结果，可选。
+    source_urls
+        原始来源 URL 列表（按首见顺序去重），用于
+        报告中的来源链接溯源展示。默认值为空元组，
+        确保已有代码向后兼容。
     """
 
     chain_id: str
@@ -145,6 +150,7 @@ class DailyReportChainEntry:
     a_share_score: Optional[AShareMappingScore] = None
     with_evidence: Optional[AShareMappingWithEvidence] = None
     chain_analysis: Optional[ChainAnalysisResult] = None
+    source_urls: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.rank < 1:
@@ -406,6 +412,16 @@ class MarkdownReportGenerator:
             lines.extend(self._render_evidences(entry.with_evidence.evidences))
             lines.append("")
 
+        # 来源链接
+        if entry.source_urls:
+            lines.append("##### 来源链接")
+            lines.append("")
+            for idx, url in enumerate(entry.source_urls, start=1):
+                # 截断过长 URL 作为显示文本
+                display_text = url if len(url) <= 80 else url[:77] + "..."
+                lines.append(f"- [{display_text}]({url})")
+            lines.append("")
+
         lines.append("---")
         lines.append("")
 
@@ -561,6 +577,7 @@ class JsonReportGenerator:
             "confidence": entry.confidence,
             "rationale": entry.rationale,
             "a_share_mapping": self._mapping_to_dict(entry.a_share_mapping),
+            "source_urls": list(entry.source_urls),
         }
 
         if entry.a_share_score:
@@ -687,6 +704,7 @@ class DailyReportBuilder:
         with_evidences: Optional[Dict[str, AShareMappingWithEvidence]] = None,
         prompt_profile: Optional[PromptProfile] = None,
         max_chains: int = 10,
+        evidence_bundles: Optional[Dict[str, ChainEvidenceBundle]] = None,
     ) -> DailyReport:
         """
         构建日报。
@@ -709,6 +727,9 @@ class DailyReportBuilder:
             使用的 PromptProfile，可选。
         max_chains
             最多包含的信息链数量，默认 10。
+        evidence_bundles
+            信息链 ID 到 ChainEvidenceBundle 的字典，可选。
+            用于提取 source_urls 进行 URL 溯源透传。
 
         返回
         -------
@@ -729,6 +750,7 @@ class DailyReportBuilder:
             scores=scores or {},
             with_evidences=with_evidences or {},
             max_chains=max_chains,
+            evidence_bundles=evidence_bundles or {},
         )
 
         # 构建风险提示
@@ -751,6 +773,7 @@ class DailyReportBuilder:
         scores: Dict[str, AShareMappingScore],
         with_evidences: Dict[str, AShareMappingWithEvidence],
         max_chains: int,
+        evidence_bundles: Dict[str, ChainEvidenceBundle],
     ) -> List[DailyReportChainEntry]:
         """构建 Top 10 链条目。"""
         entries = []
@@ -786,6 +809,12 @@ class DailyReportBuilder:
             # 生成标题（从摘要中提取前 50 个字符或使用默认）
             title = self._extract_title(chain_analysis.summary)
 
+            # 从 evidence_bundle 提取 source_urls（若可用）
+            source_urls: tuple[str, ...] = ()
+            bundle = evidence_bundles.get(chain_id)
+            if bundle is not None:
+                source_urls = bundle.source_urls
+
             entry = DailyReportChainEntry(
                 chain_id=chain_id,
                 rank=ranking_entry.rank,
@@ -797,6 +826,7 @@ class DailyReportBuilder:
                 a_share_score=scores.get(chain_id),
                 with_evidence=with_evidences.get(chain_id),
                 chain_analysis=chain_analysis,
+                source_urls=source_urls,
             )
             entries.append(entry)
 

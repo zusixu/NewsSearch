@@ -16,6 +16,7 @@ from typing import Any
 import yaml
 
 from .schema import (
+    AnalysisConfig,
     AppConfig,
     ConfigError,
     LLMConfig,
@@ -188,6 +189,25 @@ def _build_logging(raw: dict[str, Any]) -> LoggingConfig:
     )
 
 
+def _build_analysis(raw: dict[str, Any]) -> AnalysisConfig:
+    section = raw.get("analysis", {})
+    if not isinstance(section, dict):
+        raise ConfigError(
+            f"'analysis' must be a mapping, got {type(section).__name__}"
+        )
+    react = section.get("react", {})
+    if not isinstance(react, dict):
+        react = {}
+    return AnalysisConfig(
+        mode=str(section.get("mode", "legacy")),
+        react_max_steps_per_group=int(react.get("max_steps_per_group", 5)),
+        react_max_groups=int(react.get("max_groups", 10)),
+        react_enable_web_search=bool(react.get("enable_web_search", True)),
+        react_enable_web_fetch=bool(react.get("enable_web_fetch", True)),
+        react_enable_akshare_query=bool(react.get("enable_akshare_query", True)),
+    )
+
+
 def _build_llm(raw: dict[str, Any]) -> LLMConfig:
     section = raw.get("llm", {})
     if not isinstance(section, dict):
@@ -196,8 +216,9 @@ def _build_llm(raw: dict[str, Any]) -> LLMConfig:
         )
     return LLMConfig(
         endpoint=str(section.get("endpoint", "")),
-        model_id=str(section.get("model_id", "glm-5.1")),
+        model_id=str(section.get("model_id", "deepseek-v4-flash")),
         api_key_env_var=str(section.get("api_key_env_var", "LLM_API_KEY")),
+        response_format=section.get("response_format", "json_object"),
     )
 
 
@@ -262,6 +283,7 @@ def load_config(
         storage=_build_storage(raw),
         output=_build_output(raw),
         logging=_build_logging(raw),
+        analysis=_build_analysis(raw),
         github_token=(
             env_vars.get("GITHUB_TOKEN")
             if "GITHUB_TOKEN" in env_vars

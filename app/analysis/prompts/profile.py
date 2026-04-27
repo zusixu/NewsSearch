@@ -124,6 +124,16 @@ class PromptProfileConfig:
 
             tasks[task_type] = TaskTemplateMapping(template=template, overrides=overrides)
 
+        # Auto-add ReAct-internal task types (not user-configurable)
+        _REACT_DEFAULT_TEMPLATES: dict[PromptTaskType, str] = {
+            PromptTaskType.GROUPER: "grouper.json",
+            PromptTaskType.REACT_STEP: "react_step.json",
+            PromptTaskType.REACT_FINALIZE: "react_finalize.json",
+        }
+        for react_task_type, react_template in _REACT_DEFAULT_TEMPLATES.items():
+            if react_task_type not in tasks:
+                tasks[react_task_type] = TaskTemplateMapping(template=react_template)
+
         # Ensure all task types are covered
         for task_type in PromptTaskType:
             if task_type not in tasks:

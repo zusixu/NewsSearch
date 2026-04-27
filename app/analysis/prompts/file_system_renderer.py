@@ -120,6 +120,9 @@ class FileSystemPromptRenderer:
                 PromptTaskType.SUMMARY: "summary.json",
                 PromptTaskType.CHAIN_COMPLETION: "chain_completion.json",
                 PromptTaskType.INVESTMENT_RANKING: "investment_ranking.json",
+                PromptTaskType.GROUPER: "grouper.json",
+                PromptTaskType.REACT_STEP: "react_step.json",
+                PromptTaskType.REACT_FINALIZE: "react_finalize.json",
             }
             return self._base_dir / default_filenames[task_type]
 
@@ -197,7 +200,7 @@ class FileSystemPromptRenderer:
         }
         payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)
         search_keywords_json = json.dumps(self._search_keywords, ensure_ascii=False)
-        return {
+        context = {
             "profile_name": analysis_input.prompt_profile.profile_name,
             "profile_version": analysis_input.prompt_profile.version,
             "profile_description": analysis_input.prompt_profile.description,
@@ -206,6 +209,11 @@ class FileSystemPromptRenderer:
             "analysis_payload_json": payload_json,
             "search_keywords_json": search_keywords_json,
         }
+        # Merge extra_context from AnalysisInput (e.g. ReAct engine supplies
+        # react_history_json, group_json, available_tools_json).
+        if hasattr(analysis_input, "extra_context") and analysis_input.extra_context:
+            context.update(analysis_input.extra_context)
+        return context
 
     def _apply_overrides(
         self,

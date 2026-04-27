@@ -23,7 +23,7 @@ Coverage:
     * items without title+content are dropped
     * missing item fields filled with defaults
     * CollectorError from transport propagates
-- is_enabled always returns True
+- is_enabled respects sources_config.copilot_research (defaults True for backward compat)
 - source_id is "copilot_research"
 """
 
@@ -226,16 +226,29 @@ class TestCopilotResearchCollectorContract:
     def test_source_id(self):
         assert CopilotResearchCollector.source_id == "copilot_research"
 
-    def test_is_enabled_always_true(self):
+    def test_is_enabled_true_when_no_config_attribute(self):
+        """Default to True when sources_config has no copilot_research attr (backward compat)."""
         c = CopilotResearchCollector()
         assert c.is_enabled(None) is True
 
-    def test_is_enabled_true_even_when_config_false(self):
+        class _CfgNoAttr:
+            pass
+
+        assert c.is_enabled(_CfgNoAttr()) is True
+
+    def test_is_enabled_respects_config_true(self):
+        class _Cfg:
+            copilot_research = True
+
+        c = CopilotResearchCollector()
+        assert c.is_enabled(_Cfg()) is True
+
+    def test_is_enabled_respects_config_false(self):
         class _Cfg:
             copilot_research = False
 
         c = CopilotResearchCollector()
-        assert c.is_enabled(_Cfg()) is True
+        assert c.is_enabled(_Cfg()) is False
 
     def test_default_transport_is_null(self):
         c = CopilotResearchCollector()

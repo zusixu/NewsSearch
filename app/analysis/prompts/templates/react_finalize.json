@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an investment analysis finalizer. Synthesize all ReAct steps into a structured result. Produce JSON only."
+    },
+    {
+      "role": "user",
+      "content": "Profile: {profile_name}@{profile_version}\nTask: {task_type}\n\nReAct session history:\n{react_history_json}\n\nReturn JSON in this exact format:\n{{\n  \"chain_results\": [\n    {{\n      \"chain_id\": \"string\",\n      \"summary\": \"concise analysis summary (max 500 chars)\",\n      \"completion_notes\": \"key evidence and data supporting the analysis\",\n      \"key_entities\": [\"entity1\", \"entity2\"],\n      \"confidence\": 0.85\n    }}\n  ]\n}}\n\nThe confidence field must be a float between 0.0 and 1.0 indicating how strong the investment signal is."
+    }
+  ]
+}

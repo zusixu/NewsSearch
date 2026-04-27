@@ -35,6 +35,7 @@ from .override import (
     load_override,
 )
 from .schema import (
+    AnalysisConfig,
     AppConfig,
     ConfigError,
     LLMConfig,
@@ -50,6 +51,7 @@ __all__ = [
     "load_config",
     "load_override",
     "apply_override",
+    "AnalysisConfig",
     "AppConfig",
     "ConfigError",
     "LLMConfig",

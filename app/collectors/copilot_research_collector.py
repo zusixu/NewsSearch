@@ -16,9 +16,8 @@ that:
    collector logic.
 3. The interface is explicit and typed, making future maintenance easier.
 
-This collector is **MANDATORY** in every scheduled pipeline run.
-:meth:`CopilotResearchCollector.is_enabled` always returns ``True`` and
-cannot be overridden via ``sources_config``.
+This collector can be enabled or disabled via the ``copilot_research``
+flag in ``sources_config`` (see :meth:`CopilotResearchCollector.is_enabled`).
 
 Transport protocol
 ------------------
@@ -40,7 +39,7 @@ The research-specific ``query`` field is stored in
 
 web-access integration note
 ---------------------------
-``web-access`` is a **mandatory scheduled component** in every daily run.
+``web-access`` is an **optional scheduled component** in every daily run.
 This module defines *only* the integration contract.  Full web-access
 execution is a separate implementation task tracked after the transport
 layer is finalised.
@@ -177,9 +176,9 @@ class NullTransport(ResearchTransport):
 class CopilotResearchCollector(BaseCollector):
     """Research collector for Copilot + web-access deep-research.
 
-    This collector is **MANDATORY** in every daily pipeline run.
-    :meth:`is_enabled` always returns ``True``; it cannot be disabled
-    through ``sources_config``.
+    This collector can be enabled or disabled via the ``copilot_research``
+    flag in ``sources_config``.  When disabled, :meth:`is_enabled` returns
+    ``False`` and the pipeline skips this collector.
 
     The ``prompt_profile`` from :class:`~app.collectors.base.RunContext` is
     forwarded verbatim to the transport via :class:`ResearchRequest`, making
@@ -316,11 +315,14 @@ class CopilotResearchCollector(BaseCollector):
         )
 
     def is_enabled(self, sources_config: Any) -> bool:
-        """Always returns ``True``: research collection is mandatory.
+        """Return ``True`` if this collector is enabled in *sources_config*.
 
-        ``web-access`` is a fixed component of every daily run; it cannot
-        be disabled through ``sources_config``.
+        Reads the ``copilot_research`` attribute from *sources_config*.
+        If the attribute is present, returns its value; otherwise defaults
+        to ``True`` for backward compatibility.
         """
+        if hasattr(sources_config, "copilot_research"):
+            return bool(sources_config.copilot_research)
         return True
 
 

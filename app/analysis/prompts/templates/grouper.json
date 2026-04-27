@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an investment news grouping strategist. Given a set of tagged news items, determine the optimal grouping strategy. Produce a JSON object only."
+    },
+    {
+      "role": "user",
+      "content": "Prompt profile: {profile_name}@{profile_version}\nTask: {task_type}\nInput payload:\n{analysis_payload_json}\n\nGroup the following tagged outputs into coherent analysis groups. Each group should cluster related news items. Return JSON:\n{{\n  \"groups\": [\n    {{\n      \"group_id\": \"g1\",\n      \"theme\": \"...\",\n      \"member_chain_ids\": [\"...\"],\n      \"rationale\": \"...\"\n    }}\n  ],\n  \"ungrouped_chain_ids\": [\"...\"]\n}}"
+    }
+  ]
+}

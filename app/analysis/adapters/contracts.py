@@ -25,9 +25,9 @@ alongside explicit subclassing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from app.chains.chain import InformationChain
 from app.chains.evidence_retention import ChainEvidenceBundle
@@ -39,7 +39,7 @@ from app.chains.evidence_retention import ChainEvidenceBundle
 
 
 class PromptTaskType(str, Enum):
-    """The three analysis tasks supported by the adapter layer."""
+    """The analysis tasks supported by the adapter layer."""
 
     SUMMARY = "summary"
     """摘要归纳 — narrative summary of chain events."""
@@ -49,6 +49,15 @@ class PromptTaskType(str, Enum):
 
     INVESTMENT_RANKING = "investment_ranking"
     """投资排序 — rank chains by investment relevance."""
+
+    GROUPER = "grouper"
+    """分组策略 — determine optimal grouping of tagged outputs."""
+
+    REACT_STEP = "react_step"
+    """ReAct 单步迭代 — single reasoning+acting iteration."""
+
+    REACT_FINALIZE = "react_finalize"
+    """ReAct 最终输出 — synthesise steps into final analysis."""
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +117,17 @@ class AnalysisInput:
     prompt_profile
         The :class:`PromptProfile` selecting the prompt template/version for
         this call.
+    extra_context
+        Optional dict of extra placeholder values to inject into the prompt
+        render context.  Used by the ReAct engine to pass dynamic data
+        (e.g. react_history_json, group_json, available_tools_json) through
+        the standard AnalysisAdapter pipeline without modifying the renderer.
     """
 
     chains: tuple[InformationChain, ...]
     evidence_bundles: tuple[ChainEvidenceBundle, ...]
     prompt_profile: PromptProfile
+    extra_context: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if len(self.chains) != len(self.evidence_bundles):

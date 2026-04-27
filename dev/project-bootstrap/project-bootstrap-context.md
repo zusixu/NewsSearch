@@ -2,10 +2,7 @@
 
 ## 关键文件
 
-- `plan.md`
-- `ken 优先级高于 os.environ（适用于 AppConfig 的 token 字段）；os.environ 对 _inject_env 保持标准 dotenv 语义（已有 key 不覆盖）。
-- 支持通过 `MM_CONFIG_PATH` / `MM_ENV_PATH` 环境变量覆盖配置文件路径。
-- 无效配置（格式错误、非法值）统一抛出 `Capp/main.py`
+- `app/main.py`
 - `app/config/` — 配置加载模块（已完成）
   - `app/config/__init__.py` — 公共 API 导出（新增 `LoggingConfig` 导出）
   - `app/config/schema.py` — 类型化 dataclass 定义（新增 `LoggingConfig`；`AppConfig` 新增 `logging` 字段；`validate()` 新增 level/log_dir 校验）

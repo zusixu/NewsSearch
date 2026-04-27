@@ -19,6 +19,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import datetime
 import sys
 from pathlib import Path
 from typing import Protocol
@@ -26,6 +27,7 @@ from typing import Protocol
 from app.config import load_config, AppConfig
 from app.config.override import OverrideConfig, load_override, apply_override
 from app.analysis import AnalysisEngine, AnalysisEngineConfig
+from app.analysis.adapters.openai_compatible import OpenAICompatibleAPIError
 from app.analysis.prompts import PromptProfileLoader, PromptProfileConfig, MissingPromptProfileError
 from app.analysis.prompts.profile import merge_prompt_overrides
 from app.storage import (
@@ -35,6 +37,28 @@ from app.storage import (
     RunLogStore,
     get_db,
 )
+from app.reports import (
+    DailyReportBuilder,
+    ReportArchiveManager,
+)
+from app.mapping.schema import AStockMapping, AShareMappingScore, AShareMappingWithEvidence
+from app.mapping.engine import AShareMappingEngine, MappingScoringEngine, MappingEvidenceCollector
+from app.collectors import RunContext, CollectionCache
+from app.collectors.akshare_collector import AkShareCollector
+from app.collectors.web_collector import WebCollector
+from app.collectors.copilot_research_collector import CopilotResearchCollector
+from app.collectors.web_access_transport import WebAccessTransport
+from app.collectors.raw_document import RawDocument
+from app.normalize import (
+    deduplicate_by_url,
+    deduplicate_by_text,
+    normalize_time,
+    filter_last_n_days,
+    grade_credibility,
+)
+from app.entity import build_tagged_output
+from app.models.news_item import NewsItem
+from app.models.event_draft import EventDraft
 
 
 # ---------------------------------------------------------------------------
@@ -46,37 +70,190 @@ class ModeHandler(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Stub handlers (collect-only remains stub for now)
+# Collection helpers
+# ---------------------------------------------------------------------------
+
+def _create_collectors(config: AppConfig, override: OverrideConfig | None) -> list:
+    """Instantiate enabled collectors based on configuration."""
+    cache = CollectionCache(config.storage.raw_dir)
+    collectors: list = []
+
+    if config.sources.akshare:
+        collectors.append(AkShareCollector(cache=cache))
+
+    if config.sources.web:
+        # Default web sources if none configured via override
+        web_sources = None
+        if override and override.sources.web_sources:
+            web_sources = [ws.to_dict() for ws in override.sources.web_sources]
+        collectors.append(WebCollector(sources=web_sources, cache=cache))
+
+    if config.sources.copilot_research:
+        transport = WebAccessTransport()
+        collectors.append(CopilotResearchCollector(transport=transport, cache=cache))
+
+    return collectors
+
+
+def _run_collection(
+    config: AppConfig,
+    target_date: datetime.date,
+    override: OverrideConfig | None,
+    dry_run: bool = False,
+) -> list[RawDocument]:
+    """Run all enabled collectors and return aggregated RawDocument items."""
+    collectors = _create_collectors(config, override)
+    if not collectors:
+        print("  → collect  : no collectors enabled")
+        return []
+
+    ctx = RunContext(
+        run_id=f"{target_date.strftime('%Y%m%d')}_manual",
+        target_date=target_date,
+        is_backfill=False,
+        dry_run=dry_run,
+        mode="collect_only" if dry_run else "full",
+        override=override,
+    )
+
+    all_items: list[RawDocument] = []
+    total_errors = 0
+
+    for collector in collectors:
+        if not collector.is_enabled(config.sources):
+            print(f"  → collect  : skipped {collector.source_id} (disabled)")
+            continue
+
+        try:
+            result = collector.collect(ctx)
+            all_items.extend(result.items)
+            total_errors += len(result.errors)
+            print(f"  → collect  : {collector.source_id} → {len(result.items)} items")
+            if result.errors:
+                for err in result.errors:
+                    print(f"    - error  : {err}")
+        except Exception as e:
+            print(f"  → collect  : {collector.source_id} failed - {e}", file=sys.stderr)
+
+    print(f"  → collect  : total {len(all_items)} items ({total_errors} errors)")
+    return all_items
+
+
+def _run_normalization(
+    raw_items: list[RawDocument],
+    date_filter_days: int,
+) -> list[NewsItem]:
+    """Normalize raw items: convert, dedup, time-normalize, filter, grade."""
+    # Convert RawDocument → NewsItem
+    news_items = [NewsItem.from_raw(r) for r in raw_items]
+    print(f"  → normalize: {len(news_items)} items from raw")
+
+    # URL dedup
+    news_items = deduplicate_by_url(news_items)
+    print(f"  → normalize: {len(news_items)} items after URL dedup")
+
+    # Text dedup
+    news_items = deduplicate_by_text(news_items)
+    print(f"  → normalize: {len(news_items)} items after text dedup")
+
+    # Time normalization
+    news_items = normalize_time(news_items)
+    print(f"  → normalize: time normalized")
+
+    # Date filtering (keep last N days)
+    news_items = filter_last_n_days(news_items, n=date_filter_days)
+    print(f"  → normalize: {len(news_items)} items after date filter ({date_filter_days} days)")
+
+    # Source credibility grading
+    news_items = grade_credibility(news_items)
+    print(f"  → normalize: credibility graded")
+
+    return news_items
+
+
+def _build_tagged_outputs(news_items: list[NewsItem]) -> list:
+    """Build TaggedOutput from normalized NewsItem list."""
+    from app.entity.evidence import build_evidence_links
+    from app.entity.rules import RuleExtractor
+
+    extractor = RuleExtractor()
+    tagged_outputs = []
+
+    for item in news_items:
+        event = EventDraft.from_news_item(item)
+        text = f"{item.title}\n{item.content or ''}"
+        hits = extractor.extract(text)
+        evidence_links = build_evidence_links(text, hits)
+        tagged = build_tagged_output(event=event, text=text, evidence_links=evidence_links)
+        tagged_outputs.append(tagged)
+
+    print(f"  → entity   : {len(tagged_outputs)} tagged outputs")
+    return tagged_outputs
+
+
+# ---------------------------------------------------------------------------
+# Mode handlers
 # ---------------------------------------------------------------------------
 
 def _handle_collect_only(args: argparse.Namespace, config: AppConfig, profile_config: PromptProfileConfig | None, override: OverrideConfig | None = None) -> int:
-    print("[collect-only] Collection-only run (stub).")
+    print("[collect-only] Collection-only run.")
     print(f"  → config   : loaded successfully")
     if override and override != OverrideConfig():
         print(f"  → override : active (search_keywords={len(override.search_keywords)}, "
               f"akshare_providers={override.sources.akshare_providers or 'all'}, "
               f"web_sources={len(override.sources.web_sources)})")
-    print("  → collect  : not yet implemented")
+
+    target_date = datetime.datetime.strptime(args.date, "%Y-%m-%d").date() if args.date else datetime.date.today()
+    raw_items = _run_collection(config, target_date, override, dry_run=False)
+    print(f"[collect-only] Done — {len(raw_items)} items collected.")
     return 0
 
 
 def _handle_run(args: argparse.Namespace, config: AppConfig, profile_config: PromptProfileConfig | None, override: OverrideConfig | None = None) -> int:
-    print("[run] Full pipeline starting (stub - only analysis portion implemented).")
+    print("[run] Full pipeline starting.")
     print(f"  → config   : loaded successfully")
     print(f"  → profile  : {profile_config.profile_name if profile_config else 'default'} (version: {profile_config.version if profile_config else 'N/A'})")
     if override and override != OverrideConfig():
         print(f"  → override : active (search_keywords={len(override.search_keywords)}, "
               f"akshare_providers={override.sources.akshare_providers or 'all'}, "
               f"web_sources={len(override.sources.web_sources)})")
-    print("  → collect  : not yet implemented")
-    print("  → normalize: not yet implemented")
-    print("  → analyze  : will run dummy analysis")
-    print("  → report   : not yet implemented")
 
-    # Run analysis portion
+    target_date = datetime.datetime.strptime(args.date, "%Y-%m-%d").date() if args.date else datetime.date.today()
+
+    # Collection
+    raw_items = _run_collection(config, target_date, override, dry_run=False)
+    if not raw_items:
+        print("[run] No items collected — stopping.")
+        return 0
+
+    # Normalization
+    news_items = _run_normalization(raw_items, date_filter_days=config.sources.date_filter_days)
+    if not news_items:
+        print("[run] No items after normalization — stopping.")
+        return 0
+
+    # Entity tagging
+    tagged_outputs = _build_tagged_outputs(news_items)
+    if not tagged_outputs:
+        print("[run] No tagged outputs — stopping.")
+        return 0
+
+    # Analysis + Report (limit to top 20 tagged outputs to avoid huge LLM requests)
     if profile_config:
         search_keywords = override.search_keywords if override else []
-        _run_analysis_portion(config, profile_config, dry_run=False, search_keywords=search_keywords)
+        _run_analysis_portion(
+            config,
+            profile_config,
+            dry_run=False,
+            search_keywords=search_keywords,
+            report_date=args.date,
+            tagged_outputs=tagged_outputs[:20],
+            analysis_mode=args.analysis_mode,
+        )
+    else:
+        print("[warn] No prompt profile — analysis skipped.")
+
+    print("[run] Pipeline complete.")
     return 0
 
 
@@ -87,7 +264,7 @@ def _handle_analyze_only(args: argparse.Namespace, config: AppConfig, profile_co
 
     if profile_config:
         search_keywords = override.search_keywords if override else []
-        _run_analysis_portion(config, profile_config, dry_run=False, search_keywords=search_keywords)
+        _run_analysis_portion(config, profile_config, dry_run=False, search_keywords=search_keywords, report_date=args.date, analysis_mode=args.analysis_mode)
     else:
         print("[error] No prompt profile config available")
         return 1
@@ -151,7 +328,7 @@ def _handle_dry_run(args: argparse.Namespace, config: AppConfig, profile_config:
     if profile_config:
         print("\n[dry-run] Testing analysis engine...")
         search_keywords = override.search_keywords if override else []
-        _run_analysis_portion(config, profile_config, dry_run=True, search_keywords=search_keywords)
+        _run_analysis_portion(config, profile_config, dry_run=True, search_keywords=search_keywords, report_date=args.date, analysis_mode=args.analysis_mode)
 
     print("\n[dry-run] Complete - no data written to persistent storage.")
     return 0
@@ -166,34 +343,48 @@ def _run_analysis_portion(
     profile_config: PromptProfileConfig,
     dry_run: bool = True,
     search_keywords: list[str] | None = None,
+    report_date: str | None = None,
+    tagged_outputs: list | None = None,
+    analysis_mode: str | None = None,
 ) -> None:
     """
     Run the analysis portion of the pipeline.
 
-    This function uses dummy/test data for now, but demonstrates the full flow.
+    When ``tagged_outputs`` is provided, uses real data; otherwise falls back
+    to a single dummy item for wiring tests.
+
+    ``analysis_mode`` — CLI override for analysis mode ("react" | "legacy").
+    When ``None``, uses ``config.analysis.mode`` from config.yaml.
     """
     from app.chains.chain import build_chain
-    from app.entity.tagged_output import build_tagged_output
+    from app.chains.evidence_retention import ChainEvidenceBundle, collect_all_evidence
+    from app.entity.tagged_output import build_tagged_output as _build_tagged_output
     from app.models.event_draft import EventDraft
     from app.models.news_item import NewsItem
     from app.models.raw_document import RawDocument
 
-    # Build some dummy tagged outputs for testing
-    dummy_raw = RawDocument(
-        source="test",
-        provider="test",
-        title="Test News",
-        content="Test Content",
-        url=None,
-        date="2025-01-01",
-    )
-    dummy_news = NewsItem.from_raw(dummy_raw)
-    dummy_event = EventDraft.from_news_item(dummy_news)
-    dummy_tagged = build_tagged_output(
-        event=dummy_event,
-        text="Test Content",
-        evidence_links=[],
-    )
+    if tagged_outputs:
+        tagged_inputs = tagged_outputs
+    else:
+        # Fallback dummy data for dry-run / wiring tests
+        dummy_raw = RawDocument(
+            source="test",
+            provider="test",
+            title="Test News",
+            content="Test Content",
+            url=None,
+            date="2025-01-01",
+        )
+        dummy_news = NewsItem.from_raw(dummy_raw)
+        dummy_event = EventDraft.from_news_item(dummy_news)
+        tagged_inputs = [_build_tagged_output(
+            event=dummy_event,
+            text="Test Content",
+            evidence_links=[],
+        )]
+
+    # Determine analysis mode: CLI arg > config.yaml
+    resolved_mode = analysis_mode if analysis_mode else config.analysis.mode
 
     # Create analysis engine
     engine_config = AnalysisEngineConfig(
@@ -205,16 +396,33 @@ def _run_analysis_portion(
         llm_endpoint=config.llm.endpoint,
         llm_api_key=config.llm_api_key,
         llm_api_key_env_var=config.llm.api_key_env_var,
+        llm_response_format=config.llm.response_format,
+        llm_timeout=180,
+        analysis_mode=resolved_mode,
+        react_max_steps_per_group=config.analysis.react_max_steps_per_group,
+        react_max_groups=config.analysis.react_max_groups,
+        react_enable_web_search=config.analysis.react_enable_web_search,
+        react_enable_web_fetch=config.analysis.react_enable_web_fetch,
+        react_enable_akshare_query=config.analysis.react_enable_akshare_query,
     )
     engine = AnalysisEngine(engine_config, dry_run=dry_run, search_keywords=search_keywords, profile_config=profile_config)
 
-    print(f"  → engine   : created (dry-run={dry_run})")
+    print(f"  → engine   : created (dry-run={dry_run}, mode={resolved_mode})")
 
     # Run analysis
-    chains, response, used_profile = engine.run_full_analysis(
-        [dummy_tagged],
-        profile_name=profile_config.profile_name,
-    )
+    try:
+        chains, response, used_profile = engine.run_full_analysis(
+            tagged_inputs,
+            profile_name=profile_config.profile_name,
+        )
+    except TimeoutError as exc:
+        print(f"  → analysis : FAILED — LLM API timed out ({exc})", file=sys.stderr)
+        print("[run] Analysis timed out — stopping.", file=sys.stderr)
+        return
+    except (OpenAICompatibleAPIError, Exception) as exc:
+        print(f"  → analysis : FAILED — {exc}", file=sys.stderr)
+        print("[run] Analysis failed — stopping.", file=sys.stderr)
+        return
 
     print(f"  → chains   : built {len(chains)} chains")
     print(f"  → analysis : complete, got {len(response.chain_results)} chain results")
@@ -272,6 +480,58 @@ def _run_analysis_portion(
             # Finish run log
             run_store.finish_run(run_id, success=True)
             print(f"  → run      : finished successfully")
+
+            # Generate report
+            report_date = report_date or datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+            report_batch = "pre-market"  # Default batch for manual runs
+
+            # Build A-share mappings using the mapping engine
+            mapping_engine = AShareMappingEngine()
+            scoring_engine = MappingScoringEngine()
+            evidence_collector = MappingEvidenceCollector()
+
+            mappings: dict[str, AStockMapping] = {}
+            scores: dict[str, AShareMappingScore] = {}
+            with_evidences: dict[str, AShareMappingWithEvidence] = {}
+
+            for chain in chains:
+                mapping = mapping_engine.map_information_chain(chain)
+                score = scoring_engine.score_mapping(mapping, chain.theme_ids)
+                with_evidence = evidence_collector.collect_for_information_chain(chain, mapping)
+
+                mappings[chain.chain_id] = mapping
+                scores[chain.chain_id] = score
+                with_evidences[chain.chain_id] = with_evidence
+
+            print(f"  → mapping  : generated {len(mappings)} A-share mappings")
+
+            # Collect evidence bundles from chains (needed for react mode source URLs)
+            evidence_bundles_list = collect_all_evidence(chains)
+            evidence_bundles: dict[str, ChainEvidenceBundle] = {}
+            for chain, bundle in zip(chains, evidence_bundles_list):
+                evidence_bundles[chain.chain_id] = bundle
+            print(f"  → evidence : collected {len(evidence_bundles)} bundles")
+
+            builder = DailyReportBuilder()
+            report = builder.build(
+                report_date=report_date,
+                report_batch=report_batch,
+                analysis_response=response,
+                mappings=mappings,
+                scores=scores,
+                with_evidences=with_evidences,
+                prompt_profile=used_profile,
+                evidence_bundles=evidence_bundles,
+            )
+
+            archive = ReportArchiveManager(config.output.reports_dir)
+            saved = archive.save_report(
+                report,
+                save_markdown="markdown" in config.output.formats,
+                save_json="json" in config.output.formats,
+            )
+            for fmt, path in saved.items():
+                print(f"  → report   : saved {fmt} → {path}")
 
         except Exception as e:
             print(f"  → storage  : failed to persist - {e}", file=sys.stderr)
@@ -332,6 +592,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a YAML override file for customising search keywords, "
              "data sources, and prompts for this run",
+    )
+    parser.add_argument(
+        "--analysis-mode",
+        choices=["react", "legacy"],
+        default=None,
+        metavar="MODE",
+        help="Analysis mode override (react | legacy); "
+             "defaults to config.yaml analysis.mode",
     )
     return parser
 

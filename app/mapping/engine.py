@@ -20,6 +20,7 @@ from app.mapping.industry_chain import (
     IndustryChainPosition,
     get_industry_chain_map,
 )
+from app.mapping.akshare_resolver import AkShareStockResolver, create_akshare_resolver
 from app.mapping.schema import (
     AStockMapping,
     ConfidenceLevel,
@@ -60,13 +61,23 @@ class MappingResult:
 class AShareMappingEngine:
     """
     A 股映射引擎，实现从信息链到 A 股映射的转换规则。
+
+    Parameters
+    ----------
+    industry_chain_map
+        自定义产业链映射，默认使用全局单例。
+    stock_resolver
+        可选的 AkShare 股票解析器，用于动态补充个股映射。
+        为 ``None`` 时完全依赖硬编码 ``stock_candidates``（向后兼容）。
     """
 
     def __init__(
         self,
         industry_chain_map: Optional[IndustryChainMap] = None,
+        stock_resolver: Optional[AkShareStockResolver] = None,
     ) -> None:
         self._chain_map = industry_chain_map or get_industry_chain_map()
+        self._stock_resolver = stock_resolver
 
     def map_tagged_output(
         self,
@@ -227,27 +238,44 @@ class AShareMappingEngine:
     ) -> List[IndividualStockMapping]:
         """
         构建具体个股映射。
+
+        当 ``stock_resolver`` 存在时，会通过 AkShare 动态补充板块成分股，
+        与硬编码 ``stock_candidates`` 合并后去重输出。
         """
         mappings = []
         seen_codes = set()
 
-        # 从产业链节点获取候选股票
+        # 从产业链节点获取候选股票，按 sector 精确匹配
         for sector in sector_mappings:
-            nodes = self._chain_map.get_nodes_by_theme(ThemeId.AI)
-            for node in nodes:
-                for stock_code, stock_name in node.stock_candidates:
-                    if stock_code not in seen_codes:
-                        seen_codes.add(stock_code)
-                        mapping = IndividualStockMapping(
-                            stock_code=stock_code,
-                            stock_name=stock_name,
-                            confidence=ConfidenceLevel.MEDIUM,
-                            rationale=f"{stock_name} 属于 {node.sector_name} 板块，受益于 AI 产业趋势",
-                            impact_direction="受益",
-                            pool_name=f"{node.sector_name} 受益标的",
-                            notes="建议结合基本面和估值进一步分析",
-                        )
-                        mappings.append(mapping)
+            for theme_id_str in sector.theme_ids:
+                try:
+                    theme_id = ThemeId(theme_id_str)
+                except ValueError:
+                    continue
+                nodes = self._chain_map.get_nodes_by_theme(theme_id)
+                for node in nodes:
+                    if node.sector_name != sector.sector_name:
+                        continue
+
+                    # 获取候选股票：优先使用 resolver 动态扩展，否则回退硬编码
+                    if self._stock_resolver is not None:
+                        candidates = self._stock_resolver.resolve_stocks_for_node(node)
+                    else:
+                        candidates = node.stock_candidates
+
+                    for stock_code, stock_name in candidates:
+                        if stock_code not in seen_codes:
+                            seen_codes.add(stock_code)
+                            mapping = IndividualStockMapping(
+                                stock_code=stock_code,
+                                stock_name=stock_name,
+                                confidence=ConfidenceLevel.MEDIUM,
+                                rationale=f"{stock_name} 属于 {node.sector_name} 板块，受益于 AI 产业趋势",
+                                impact_direction="受益",
+                                pool_name=f"{node.sector_name} 受益标的",
+                                notes="建议结合基本面和估值进一步分析",
+                            )
+                            mappings.append(mapping)
 
         # 最多返回 10 个个股映射，避免输出过多
         return mappings[:10]
@@ -323,11 +351,18 @@ class AShareMappingEngine:
 # ---------------------------------------------------------------------------
 
 
-def create_mapping_engine() -> AShareMappingEngine:
+def create_mapping_engine(
+    stock_resolver: Optional[AkShareStockResolver] = None,
+) -> AShareMappingEngine:
     """
     创建默认配置的 A 股映射引擎。
+
+    Parameters
+    ----------
+    stock_resolver
+        可选的 AkShare 股票解析器，注入后可动态扩展个股映射。
     """
-    return AShareMappingEngine()
+    return AShareMappingEngine(stock_resolver=stock_resolver)
 
 
 def map_chain_to_a_share(chain: InformationChain) -> AStockMapping:

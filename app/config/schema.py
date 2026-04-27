@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 _HH_MM_RE = re.compile(r"^\d{2}:\d{2}$")
 _VALID_OUTPUT_FORMATS = {"markdown", "json"}
 _VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+_VALID_ANALYSIS_MODES = {"react", "legacy"}
 
 
 class ConfigError(ValueError):
@@ -58,8 +59,9 @@ class LLMConfig:
     Otherwise falls back to the GitHub Models adapter (legacy).
     """
     endpoint: str = ""
-    model_id: str = "glm-5.1"
+    model_id: str = "deepseek-v4-flash"
     api_key_env_var: str = "LLM_API_KEY"
+    response_format: str | None = "json_object"
 
 
 @dataclass
@@ -83,6 +85,17 @@ class LoggingConfig:
     level: str = "INFO"           # one of DEBUG / INFO / WARNING / ERROR / CRITICAL
 
 
+@dataclass
+class AnalysisConfig:
+    """Analysis pipeline mode and ReAct-specific tuning parameters."""
+    mode: str = "legacy"                     # "react" | "legacy"
+    react_max_steps_per_group: int = 5
+    react_max_groups: int = 10
+    react_enable_web_search: bool = True
+    react_enable_web_fetch: bool = True
+    react_enable_akshare_query: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -102,6 +115,7 @@ class AppConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
 
     # Loaded from .env — never from YAML
     github_token: str = ""
@@ -140,4 +154,22 @@ class AppConfig:
             raise ConfigError(
                 f"sources.date_filter_days must be >= 1; "
                 f"got {self.sources.date_filter_days}"
+            )
+
+        if self.analysis.mode not in _VALID_ANALYSIS_MODES:
+            raise ConfigError(
+                f"analysis.mode {self.analysis.mode!r} is not valid; "
+                f"allowed values are {sorted(_VALID_ANALYSIS_MODES)}"
+            )
+
+        if self.analysis.react_max_steps_per_group < 1:
+            raise ConfigError(
+                f"analysis.react_max_steps_per_group must be >= 1; "
+                f"got {self.analysis.react_max_steps_per_group}"
+            )
+
+        if self.analysis.react_max_groups < 1:
+            raise ConfigError(
+                f"analysis.react_max_groups must be >= 1; "
+                f"got {self.analysis.react_max_groups}"
             )

@@ -17,6 +17,7 @@ from app.mapping.schema import (
     MappingEvidence,
     AShareMappingWithEvidence,
 )
+from app.mapping.akshare_resolver import AkShareStockResolver, create_akshare_resolver
 from app.mapping.industry_chain import (
     IndustryChainPosition,
     IndustryChainNode,
@@ -68,6 +69,8 @@ __all__ = [
     "IndustryChainMap",
     "get_industry_chain_map",
     "reload_industry_chain_map",
+    "AkShareStockResolver",
+    "create_akshare_resolver",
     "AShareMappingEngine",
     "MappingResult",
     "create_mapping_engine",
