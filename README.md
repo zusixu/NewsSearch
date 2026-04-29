@@ -148,10 +148,8 @@ D:\project\mm\
 
 ## What is NOT yet implemented
 
-- Source collection (AkShare, web, Copilot research)
-- Normalization and entity extraction
-- LLM analysis and ranking
-- Report generation
-- Scheduler / Task Scheduler registration
+
+- LLM analysis prompt
+
 
 These are tracked in `plan.md` and will be implemented in subsequent subtasks.

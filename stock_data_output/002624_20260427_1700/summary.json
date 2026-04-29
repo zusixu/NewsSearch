@@ -1,0 +1,100 @@
+{
+  "stock_code": "002624.SZ",
+  "stock_name": "完美世界",
+  "market": "sz",
+  "output_dir": "D:\\project\\mm\\stock_data_output\\002624_20260427_1700",
+  "fetch_time": "2026-04-27T17:00:51.318290",
+  "kline_source": "none",
+  "images": {
+    "kline": "D:\\project\\mm\\stock_data_output\\002624_20260427_1700\\kline_em.png",
+    "kline_intraday": "D:\\project\\mm\\stock_data_output\\002624_20260427_1700\\kline_intraday.png",
+    "valuation": "D:\\project\\mm\\stock_data_output\\002624_20260427_1700\\valuation.png"
+  },
+  "data": {
+    "financials": {
+      "currentPrice": 16.28,
+      "previousClose": 17.12,
+      "trailingPE": 35.59,
+      "priceToBook": 4.46,
+      "marketCap": 31582685617.120003,
+      "fiftyTwoWeekHigh": 16.73,
+      "fiftyTwoWeekLow": 16.02,
+      "shortName": "完美世界"
+    },
+    "technicals": {},
+    "capital_flow_summary": {
+      "type": "北向资金",
+      "consecutive_days": 0,
+      "direction": "净卖出",
+      "recent_total_万股": 0.0
+    },
+    "main_capital_flow": {
+      "recent_days": [
+        {
+          "date": "2026-04-27",
+          "main_net_inflow": -66797648.0,
+          "retail_net_inflow": 112066224.0
+        }
+      ],
+      "total_main_net_inflow": -66797648.0,
+      "direction": "主力净流出",
+      "consecutive_days": 1
+    },
+    "cls_news": [],
+    "analyst_reports": [
+      {
+        "org": "东吴证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "2025年报及2026年一季报点评：创新中药引领增长，盈利与现金流双升",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610737",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610737_1.pdf"
+      },
+      {
+        "org": "东兴证券",
+        "rating": "增持",
+        "change": 3,
+        "title": "成长弹性持续优化，金铜增储推升资源潜力",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610452",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610452_1.pdf"
+      },
+      {
+        "org": "开源证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "公司信息更新报告：业绩符合预期，拟投资光敏聚酰亚胺材料产业化项目",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610436",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610436_1.pdf"
+      },
+      {
+        "org": "东吴证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "2025年年报&2026年一季报点评：盈利能力短期承压，线束产业转型升级加速",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610181",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610181_1.pdf"
+      },
+      {
+        "org": "中邮证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "经营持续回暖，Q1盈利弹性显著",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821609966",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821609966_1.pdf"
+      }
+    ],
+    "macro": {},
+    "adr": {}
+  },
+  "text_charts": {},
+  "export_options": {
+    "pdf_cmd": "python3 D:\\project\\mm\\export_report.py {out}/report.md --format pdf",
+    "html_cmd": "python3 D:\\project\\mm\\export_report.py {out}/report.md --format html",
+    "open_html": "open {out}/report.html"
+  }
+}

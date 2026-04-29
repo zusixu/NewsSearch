@@ -1,0 +1,90 @@
+{
+  "stock_code": "002624.SS",
+  "stock_name": "",
+  "market": "sh",
+  "output_dir": "D:\\project\\mm\\stock_data_output\\002624_20260427_1648",
+  "fetch_time": "2026-04-27T16:48:24.436391",
+  "kline_source": "akshare",
+  "images": {
+    "kline": "D:\\project\\mm\\stock_data_output\\002624_20260427_1648\\kline_em.png"
+  },
+  "data": {
+    "financials": {},
+    "technicals": {
+      "close": 16.28,
+      "ma5": 18.53,
+      "ma20": 19.3,
+      "vol_ratio": 1.76,
+      "rsi": 31.4,
+      "macd_hist": -0.3309,
+      "prev_macd_hist": -0.17,
+      "ma60": 19.44,
+      "ma_status": "空头排列",
+      "macd_status": "动能减弱",
+      "rsi_status": "中性"
+    },
+    "capital_flow_summary": {
+      "type": "北向资金",
+      "consecutive_days": 0,
+      "direction": "净卖出",
+      "recent_total_万股": 0.0
+    },
+    "main_capital_flow": {},
+    "cls_news": [],
+    "analyst_reports": [
+      {
+        "org": "开源证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "公司信息更新报告：业绩符合预期，拟投资光敏聚酰亚胺材料产业化项目",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610436",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610436_1.pdf"
+      },
+      {
+        "org": "东吴证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "2025年年报&2026年一季报点评：盈利能力短期承压，线束产业转型升级加速",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821610181",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821610181_1.pdf"
+      },
+      {
+        "org": "中邮证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "经营持续回暖，Q1盈利弹性显著",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821609966",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821609966_1.pdf"
+      },
+      {
+        "org": "中邮证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "业绩符合预期，增储成绩斐然",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821609909",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821609909_1.pdf"
+      },
+      {
+        "org": "中邮证券",
+        "rating": "买入",
+        "change": 3,
+        "title": "业绩超预期，积极分红回报股东",
+        "date": "2026-04-27",
+        "infoCode": "AP202604271821609908",
+        "pdf_url": "https://pdf.dfcfw.com/pdf/H3_AP202604271821609908_1.pdf"
+      }
+    ],
+    "macro": {},
+    "adr": {}
+  },
+  "text_charts": {},
+  "export_options": {
+    "pdf_cmd": "python3 D:\\project\\mm\\export_report.py {out}/report.md --format pdf",
+    "html_cmd": "python3 D:\\project\\mm\\export_report.py {out}/report.md --format html",
+    "open_html": "open {out}/report.html"
+  }
+}
